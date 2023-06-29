@@ -34,7 +34,7 @@ const Config: any = {
         "what music is that", "what that music is", "what song is played", "what song was being played", "whats the title of the song",
         "whats the name of the song", "what the name of the song",
         "identify the song", "identify this song", "recognize this song", "what song is in the background",
-        "what song did you use", "\nsong id?", "\nsong name?", "\nsong title?",
+        "what song did you use", "\nsong id?", "\nsong name?", "\nsong title?", "!song",
         "recognizesong", "u/auddbot", "u/find-song"
     ],
     DefiniteTriggers: [
@@ -211,7 +211,7 @@ async function getVideoLink(comment: Comment, metadata?: Metadata) {
         throw new Error("Empty comment");
     }
     let parentId;
-    const commentsTree = [];
+    const commentsTree: Comment[] = [];
 
     parentId = comment.parentId;
     commentsTree.push(comment);
@@ -902,17 +902,13 @@ Devvit.addTrigger({
         }
         // todo: check if already processed
         const comment = await reddit.getCommentById(request.comment.id as string, metadata);
-        HandleQuery(comment, undefined, true, false, metadata).then(async (result) => {
-            if (result.response) {
-
-                await reddit.submitComment({richtext: result.response, id: comment.id}, metadata);
-            }
-            if (result.additional_low_confidence) {
-                await reddit.sendPrivateMessage({subject: "Some additional low-confidence results", text: result.additional_low_confidence, to: comment.authorName}, metadata);
-            }
-        }).catch((err) => {
-            capture(err);
-        });
+        let result = await HandleQuery(comment, undefined, true, false, metadata);
+        if (result.response) {
+            await reddit.submitComment({richtext: result.response, id: comment.id}, metadata);
+        }
+        if (result.additional_low_confidence) {
+            await reddit.sendPrivateMessage({subject: "Some additional low-confidence results", text: result.additional_low_confidence, to: comment.authorName}, metadata);
+        }
     },
 });
 
@@ -943,16 +939,13 @@ Devvit.addTrigger({
         }
 
         const post = await reddit.getPostById(request.post.id as string, metadata);
-        HandleQuery(undefined, post, true, false, metadata).then(async (result) => {
-            if (result.response) {
-                await reddit.submitComment({richtext: result.response, id: post.id}, metadata);
-            }
-            if (result.additional_low_confidence) {
-                await reddit.sendPrivateMessage({subject: "Some additional low-confidence results", text: result.additional_low_confidence, to: post.authorName}, metadata);
-            }
-        }).catch((err) => {
-            capture(err);
-        });
+        let result = await HandleQuery(undefined, post, true, false, metadata);
+        if (result.response) {
+            await reddit.submitComment({richtext: result.response, id: post.id}, metadata);
+        }
+        if (result.additional_low_confidence) {
+            await reddit.sendPrivateMessage({subject: "Some additional low-confidence results", text: result.additional_low_confidence, to: post.authorName}, metadata);
+        }
     },
 });
 

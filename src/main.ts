@@ -857,7 +857,7 @@ Devvit.addAction({
         }
         let success = result.response != "";
         if(success) {
-            result.response = "Successfully identified music in post, sent you a PM with the results!";
+            result.response = "Identified music in the post, sent you a PM with the results!";
         }
         return { success: success, message: result.response};
     },
@@ -886,7 +886,7 @@ Devvit.addAction({
         }
         let success = result.response != "";
         if(success) {
-            result.response = "Successfully identified music in post, sent you a PM with the results!";
+            result.response = "Identified linked music, sent you a PM with the results!";
         }
         return { success: success, message: result.response};
     },
@@ -927,7 +927,7 @@ Devvit.addTrigger({
             await reddit.submitComment({text: result.response, id: comment.id}, metadata);
         }
         if (result.additional_low_confidence) {
-            await reddit.sendPrivateMessage({subject: "Some additional low-confidence results", text: result.additional_low_confidence, to: comment.authorName}, metadata);
+            await reddit.sendPrivateMessage({subject: "Song ID: Some additional low-confidence results", text: result.additional_low_confidence, to: comment.authorName}, metadata);
         }
     },
 });
@@ -964,7 +964,7 @@ Devvit.addTrigger({
             await reddit.submitComment({text: result.response, id: post.id}, metadata);
         }
         if (result.additional_low_confidence) {
-            await reddit.sendPrivateMessage({subject: "Some additional low-confidence results", text: result.additional_low_confidence, to: post.authorName}, metadata);
+            await reddit.sendPrivateMessage({subject: "Song ID: Some additional low-confidence results", text: result.additional_low_confidence, to: post.authorName}, metadata);
         }
     },
 });

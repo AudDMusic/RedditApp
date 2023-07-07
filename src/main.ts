@@ -19,8 +19,11 @@ import {
     RedditAPIClient,
 } from "@devvit/public-api";
 import { URL } from 'whatwg-url';
+import { URLSearchParams } from "whatwg-url"
 Devvit.use(Devvit.Types.HTTP);
 const reddit = new RedditAPIClient();
+
+// const kv = new KeyValueStorage();
 
 const Config: any = {
     Triggers: [
@@ -496,10 +499,11 @@ async function HandleQuery(comment: Comment|undefined, post: Post|undefined, sen
         atTheEnd = "true";
     }
     let APIresult: Result;
+    // const APIresult = await kv.get(resultUrl, metadata); //todo
     try {
-        APIresult = ConvertToEnterpriseResult(await AudDRequest("https://enterprise.audd.io/", {
+        let apiParams = {
             url: resultUrl,
-            api_token: (getSetting(
+            api_token: (await getSetting(
                 "api_token",
                 metadata
             )) as unknown as string,
@@ -507,12 +511,13 @@ async function HandleQuery(comment: Comment|undefined, post: Post|undefined, sen
             skip_first_seconds: timestamp,
             reversed_order: atTheEnd,
             accurate_offsets: true,
-        }));
+        };
+        APIresult = ConvertToEnterpriseResult(await AudDRequest("https://enterprise.audd.io/", apiParams));
     } catch (err) {
         capture(err);
         return Promise.resolve({response: "Error while sending a Music ID request, sorry :(", additional_low_confidence: "error"});
     }
-    const useFormatting = false; // todo use the config
+    const useFormatting = true; // todo use the config
     let response = GetReply(APIresult, withLinks, true, !isLivestream, false, minScore)
     if(!APIresult.status) {
         console.error("No status in the response", APIresult);
@@ -534,7 +539,7 @@ async function HandleQuery(comment: Comment|undefined, post: Post|undefined, sen
             }
         }
         if(response === "") {
-            console.log(APIresult.error);
+            console.log(APIresult);
             return Promise.resolve({response: "", additional_low_confidence: ""});
         }
     }
@@ -543,10 +548,16 @@ async function HandleQuery(comment: Comment|undefined, post: Post|undefined, sen
         console.error("No result in the response", APIresult);
         return Promise.resolve({response: "", additional_low_confidence: ""});
     }
+    /* try {
+        // Put has an empty return, so use try/catch to detect errors
+        await kv.put(resultUrl, JSON.stringify(result), metadata);
+    } catch (err) {
+        throw new Error(`Error putting values in kvstore: ${err}`);
+    } */ // todo
     const footerLinks = [
-        "*I am a bot and this action was performed automatically*",
-        "[GitHub](https://github.com/AudDMusic/RedditBot) " +
-        "[^(new issue)](https://github.com/AudDMusic/RedditBot/issues/new)",
+        "*This action was performed automatically*",
+        "[GitHub](https://github.com/AudDMusic/RedditApp) " +
+        "[^(new issue)](https://github.com/AudDMusic/RedditApp/issues/new)",
         "[Donate](https://github.com/AudDMusic/RedditBot/wiki/Please-consider-donating)",
     //"[Feedback](/message/compose?to=Mihonarium&subject=Music%20recognition%20" + parentID + ")"
     ];
@@ -805,11 +816,12 @@ function GetReply(APIresult: any, withLinks: boolean, matched: boolean, full: bo
 
 
 function AudDRequest(url: string, params: any) {
+    var form_data = new URLSearchParams(params);
     return fetch(url, {
         method: "POST",
-        body: JSON.stringify(params),
+        body: form_data.toString(),
         headers: {
-            "Content-Type": "application/json",
+            "Content-Type": "application/x-www-form-urlencoded",
         },
     }).then((res) => res.json());
 }
@@ -843,7 +855,11 @@ Devvit.addAction({
                 await reddit.sendPrivateMessage({subject: "Additional low-confidence music ID results", text: result.additional_low_confidence, to: user.username}, metadata);
             }
         }
-        return { success: result.response != "" && result.additional_low_confidence != "", message: result.response};
+        let success = result.response != "";
+        if(success) {
+            result.response = "Successfully identified music in post, sent you a PM with the results!";
+        }
+        return { success: success, message: result.response};
     },
 });
 
@@ -868,7 +884,11 @@ Devvit.addAction({
                 await reddit.sendPrivateMessage({subject: "Additional low-confidence music ID results", text: result.additional_low_confidence, to: user.username}, metadata);
             }
         }
-        return { success: result.response != "" && result.additional_low_confidence != "", message: result.response};
+        let success = result.response != "";
+        if(success) {
+            result.response = "Successfully identified music in post, sent you a PM with the results!";
+        }
+        return { success: success, message: result.response};
     },
 });
 
@@ -876,7 +896,7 @@ Devvit.addTrigger({
     event: Devvit.Trigger.CommentSubmit,
     async handler(request: CommentSubmit, metadata?: Metadata) {
         if (request.author?.id === getFromMetadata(Header.AppUser, metadata)) {
-            console.log('hey! my app created this comment; not going to respond');
+            console.log('our own comment; not going to respond');
             return;
         }
         console.log(`Received OnCommentSubmit event:\n${JSON.stringify(request)}`);
@@ -889,7 +909,7 @@ Devvit.addTrigger({
         if (!substringInSlice(compare, Config.Triggers)) {
             return;
         }
-        let scanComments = getSetting(
+        let scanComments = await getSetting(
             "scan_comments",
             metadata
         ) as unknown as boolean;
@@ -904,7 +924,7 @@ Devvit.addTrigger({
         const comment = await reddit.getCommentById(request.comment.id as string, metadata);
         let result = await HandleQuery(comment, undefined, true, false, metadata);
         if (result.response) {
-            await reddit.submitComment({richtext: result.response, id: comment.id}, metadata);
+            await reddit.submitComment({text: result.response, id: comment.id}, metadata);
         }
         if (result.additional_low_confidence) {
             await reddit.sendPrivateMessage({subject: "Some additional low-confidence results", text: result.additional_low_confidence, to: comment.authorName}, metadata);
@@ -918,7 +938,7 @@ Devvit.addTrigger({
     async handler(request: PostSubmit, metadata?: Metadata) {
         console.log(JSON.stringify(request));
         console.log(`Received OnPostSubmit event:\n${JSON.stringify(request)}`);
-        let identifyOnAllPosts = getSetting(
+        let identifyOnAllPosts = await getSetting(
             "identify_all_new_posts",
             metadata
         ) as unknown as boolean;
@@ -941,7 +961,7 @@ Devvit.addTrigger({
         const post = await reddit.getPostById(request.post.id as string, metadata);
         let result = await HandleQuery(undefined, post, true, false, metadata);
         if (result.response) {
-            await reddit.submitComment({richtext: result.response, id: post.id}, metadata);
+            await reddit.submitComment({text: result.response, id: post.id}, metadata);
         }
         if (result.additional_low_confidence) {
             await reddit.sendPrivateMessage({subject: "Some additional low-confidence results", text: result.additional_low_confidence, to: post.authorName}, metadata);
